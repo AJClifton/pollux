@@ -1,5 +1,13 @@
+from datetime import datetime, timezone
+
 import redis
 from flask_sqlalchemy import SQLAlchemy
+
+
+def utcnow() -> datetime:
+    """Return the current UTC time as a naive datetime for consistent DB storage across SQLite and PostgreSQL."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 db = SQLAlchemy()
 redis_client = None

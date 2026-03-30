@@ -1,12 +1,13 @@
-from app.core.extensions import db
+from app.core.extensions import db, utcnow
 
 
-class HourlyForecast(db.Model):
+class HourlyForecastModel(db.Model):
     __tablename__ = "hourly_forecasts"
 
     latitude = db.Column(db.Float, primary_key=True)
     longitude = db.Column(db.Float, primary_key=True)
     datetime = db.Column(db.DateTime, primary_key=True)
+    fetched_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     temperature = db.Column(db.Float)
     dewpoint = db.Column(db.Float)
     rain = db.Column(db.Float)

@@ -1,6 +1,7 @@
 from flask import current_app
 
-from app.services import open_meteo_client, redis_service
+from app.services import redis_service
+from app.services.open_meteo_client import OpenMeteoClient
 from app.services.request_coalescer import geocode_coalescer
 
 
@@ -10,13 +11,12 @@ def get_coordinates(name):
     cache_key = f"geocode:{normalized}"
     ttl = current_app.config["GEOCODE_CACHE_TTL"]
 
-    # 1. Try Redis
     cached = redis_service.cache_get(cache_key)
     if cached:
         return cached
 
-    # 2. Fetch from API (with request coalescing)
-    data = geocode_coalescer.execute(cache_key, open_meteo_client.fetch_geocode, name)
+    client = OpenMeteoClient()
+    data = geocode_coalescer.execute(cache_key, client.fetch_geocode, name)
 
     results = _parse_results(data)
     redis_service.cache_set(cache_key, results, ttl)
