@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import patch, MagicMock
 
 
@@ -48,7 +49,8 @@ class TestHourlyForecastRoute:
             _mock_hourly_class(),
         ):
             # Act
-            response = client.get("/api/forecast/hourly?lat=51.51&lon=-0.13&date=2026-03-24")
+            response = client.get(
+                f"/api/forecast/hourly?lat=51.51&lon=-0.13&date={date.today().isoformat()}")
 
             # Assert
             assert response.status_code == 200
@@ -66,7 +68,8 @@ class TestHourlyForecastRoute:
             _mock_hourly_class(),
         ):
             # Act
-            response = client.get("/api/forecast/hourly?location=London&date=2026-03-24")
+            response = client.get(
+                f"/api/forecast/hourly?location=London&date={date.today().isoformat()}")
 
             # Assert
             assert response.status_code == 200
@@ -104,10 +107,19 @@ class TestHourlyForecastRoute:
             return_value=[],
         ):
             # Act
-            response = client.get("/api/forecast/hourly?location=xyznonexistent&date=2026-03-24")
+            response = client.get(
+                f"/api/forecast/hourly?location=xyznonexistent&date={date.today().isoformat()}")
 
             # Assert
             assert response.status_code == 404
+
+    def test_get_hourly_forecast_dateInPast_returns400(self, client, mock_redis):
+        # Arrange / Act
+        response = client.get("/api/forecast/hourly?lat=51.51&lon=-0.13&date=2000-01-01")
+
+        # Assert
+        assert response.status_code == 400
+        assert "error" in response.get_json()
 
     def test_get_hourly_forecast_dateTooFarInFuture_returns400(self, client, mock_redis):
         # Arrange / Act
@@ -124,7 +136,8 @@ class TestHourlyForecastRoute:
             _mock_hourly_class(side_effect=Exception("API down")),
         ):
             # Act
-            response = client.get("/api/forecast/hourly?lat=51.51&lon=-0.13&date=2026-03-24")
+            response = client.get(
+                f"/api/forecast/hourly?lat=51.51&lon=-0.13&date={date.today().isoformat()}")
 
             # Assert
             assert response.status_code == 502

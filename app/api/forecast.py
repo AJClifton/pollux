@@ -44,6 +44,9 @@ def get_hourly_forecast():
         except ValueError:
             raise ApiError("date must be in YYYY-MM-DD format", 400)
 
+        if target_date < date.today():
+            raise ApiError("date must not be in the past", 400)
+
         if target_date > date.today() + timedelta(days=6):
             raise ApiError("date must be within 6 days from today", 400)
 
