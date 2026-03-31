@@ -5,6 +5,7 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     FORECAST_CACHE_TTL = int(os.getenv("FORECAST_CACHE_TTL", 900))
+    DB_FORECAST_CACHE_TTL = int(os.getenv("DB_FORECAST_CACHE_TTL", 3600))
     GEOCODE_CACHE_TTL = int(os.getenv("GEOCODE_CACHE_TTL", 86400))
     OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
     OPEN_METEO_GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"

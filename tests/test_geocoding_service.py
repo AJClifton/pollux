@@ -36,7 +36,7 @@ class TestGetCoordinates:
         # Arrange
         with app.app_context():
             with patch(
-                "app.services.open_meteo_client.fetch_geocode",
+                "app.services.open_meteo_client.OpenMeteoClient.fetch_geocode",
                 return_value=SAMPLE_GEOCODE_RESPONSE,
             ):
                 # Act
@@ -64,7 +64,7 @@ class TestGetCoordinates:
         # Arrange
         with app.app_context():
             with patch(
-                "app.services.open_meteo_client.fetch_geocode",
+                "app.services.open_meteo_client.OpenMeteoClient.fetch_geocode",
                 return_value={"results": []},
             ):
                 # Act
@@ -77,7 +77,7 @@ class TestGetCoordinates:
         # Arrange
         with app.app_context():
             with patch(
-                "app.services.open_meteo_client.fetch_geocode",
+                "app.services.open_meteo_client.OpenMeteoClient.fetch_geocode",
                 return_value=SAMPLE_GEOCODE_RESPONSE,
             ):
                 # Act
