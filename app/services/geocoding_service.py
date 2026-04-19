@@ -8,18 +8,17 @@ from app.services.request_coalescer import geocode_coalescer
 def get_coordinates(name):
     """Resolve place name to coordinates. Redis -> Open-Meteo Geocoding API."""
     normalized = name.lower().strip()
-    cache_key = f"geocode:{normalized}"
     ttl = current_app.config["GEOCODE_CACHE_TTL"]
 
-    cached = redis_service.cache_get(cache_key)
+    cached = redis_service.cache_get("geocode", normalized)
     if cached:
         return cached
 
     client = OpenMeteoClient()
-    data = geocode_coalescer.execute(cache_key, client.fetch_geocode, name)
+    data = geocode_coalescer.execute(f"geocode:{normalized}", client.fetch_geocode, name)
 
     results = _parse_results(data)
-    redis_service.cache_set(cache_key, results, ttl)
+    redis_service.cache_set("geocode", normalized, results, ttl)
     return results
 
 

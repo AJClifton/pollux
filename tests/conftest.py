@@ -1,9 +1,18 @@
-import pytest
-from unittest.mock import MagicMock
+import os
+import tempfile
 
-from app import create_app
-from app.core.config import TestingConfig
-from app.core.extensions import db as _db
+# Must be set before importing anything from app.*, because
+# GunicornInternalPrometheusMetrics asserts PROMETHEUS_MULTIPROC_DIR at import.
+_METRIC_DIR = tempfile.mkdtemp(prefix="prom_multiproc_")
+os.environ["PROMETHEUS_MULTIPROC_DIR"] = _METRIC_DIR
+
+from unittest.mock import MagicMock  # noqa: E402
+
+import pytest  # noqa: E402
+
+from app import create_app  # noqa: E402
+from app.core.config import TestingConfig  # noqa: E402
+from app.core.extensions import db as _db  # noqa: E402
 
 
 @pytest.fixture

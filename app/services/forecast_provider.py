@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from app.core.extensions import db, utcnow
+from app.core.metrics import db_query_duration_seconds, observe
 from app.models.daily_forecast import DailyForecastModel
 from app.models.hourly_forecast import HourlyForecastModel
 from app.services.request_coalescer import forecast_coalescer
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _night_window(sunset_str, sunrise_str):
-    """Return (start, end) datetimes covering 1+ hour before sunset to 1+ hour after next-day sunrise."""
+    """Return (start,end) datetimes covering 1+ hour before sunset to 1+ hour after next sunrise"""
     sunset_dt = datetime.fromisoformat(sunset_str)
     sunrise_dt = datetime.fromisoformat(sunrise_str)
     start = sunset_dt.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
@@ -28,11 +29,12 @@ class ForecastProvider:
         """Query DB for rows fetched within TTL. Returns list of dicts or None if no fresh data."""
         cutoff = utcnow() - timedelta(seconds=ttl)
         sort_col = model_cls.datetime if hasattr(model_cls, "datetime") else model_cls.date
-        rows = model_cls.query.filter(
-            model_cls.latitude == lat,
-            model_cls.longitude == lon,
-            model_cls.fetched_at >= cutoff,
-        ).order_by(sort_col.asc()).all()
+        with observe(db_query_duration_seconds, query="forecast_daily_lookup"):
+            rows = model_cls.query.filter(
+                model_cls.latitude == lat,
+                model_cls.longitude == lon,
+                model_cls.fetched_at >= cutoff,
+            ).order_by(sort_col.asc()).all()
         return [row.to_dict() for row in rows] if rows else None
 
     def get_night_forecast_from_db(self, lat, lon, date, ttl):
@@ -40,12 +42,13 @@ class ForecastProvider:
         cutoff = utcnow() - timedelta(seconds=ttl)
         next_date = date + timedelta(days=1)
 
-        daily_rows = DailyForecastModel.query.filter(
-            DailyForecastModel.latitude == lat,
-            DailyForecastModel.longitude == lon,
-            DailyForecastModel.date.in_([date, next_date]),
-            DailyForecastModel.fetched_at >= cutoff,
-        ).all()
+        with observe(db_query_duration_seconds, query="forecast_night_daily_lookup"):
+            daily_rows = DailyForecastModel.query.filter(
+                DailyForecastModel.latitude == lat,
+                DailyForecastModel.longitude == lon,
+                DailyForecastModel.date.in_([date, next_date]),
+                DailyForecastModel.fetched_at >= cutoff,
+            ).all()
 
         if len(daily_rows) < 2:
             return None
@@ -59,13 +62,14 @@ class ForecastProvider:
 
         start, end = _night_window(today.sunset, tomorrow.sunrise)
 
-        hourly_rows = HourlyForecastModel.query.filter(
-            HourlyForecastModel.latitude == lat,
-            HourlyForecastModel.longitude == lon,
-            HourlyForecastModel.fetched_at >= cutoff,
-            HourlyForecastModel.datetime >= start,
-            HourlyForecastModel.datetime <= end,
-        ).order_by(HourlyForecastModel.datetime.asc()).all()
+        with observe(db_query_duration_seconds, query="forecast_night_hourly_lookup"):
+            hourly_rows = HourlyForecastModel.query.filter(
+                HourlyForecastModel.latitude == lat,
+                HourlyForecastModel.longitude == lon,
+                HourlyForecastModel.fetched_at >= cutoff,
+                HourlyForecastModel.datetime >= start,
+                HourlyForecastModel.datetime <= end,
+            ).order_by(HourlyForecastModel.datetime.asc()).all()
 
         if not hourly_rows:
             return None
@@ -137,7 +141,8 @@ class ForecastProvider:
         """Persist parsed forecast rows to DB."""
         self._upsert_rows(lat, lon, hourly_rows, HourlyForecastModel, "datetime")
         self._upsert_rows(lat, lon, daily_rows, DailyForecastModel, "date")
-        db.session.commit()
+        with observe(db_query_duration_seconds, query="forecast_upsert_commit"):
+            db.session.commit()
 
     def _upsert_rows(self, lat, lon, rows, model_cls, time_key):
         """Bulk insert/update rows into the DB. Does not commit."""
@@ -146,13 +151,14 @@ class ForecastProvider:
 
         parsed_times = [r[time_key] for r in rows]
         time_col = getattr(model_cls, time_key)
-        existing_times = {
-            t for (t,) in db.session.query(time_col).filter(
-                model_cls.latitude == lat,
-                model_cls.longitude == lon,
-                time_col.in_(parsed_times),
-            ).all()
-        }
+        with observe(db_query_duration_seconds, query="forecast_upsert_existing_lookup"):
+            existing_times = {
+                t for (t,) in db.session.query(time_col).filter(
+                    model_cls.latitude == lat,
+                    model_cls.longitude == lon,
+                    time_col.in_(parsed_times),
+                ).all()
+            }
 
         inserts, updates = [], []
         for d in rows:
@@ -164,7 +170,7 @@ class ForecastProvider:
             db.session.bulk_update_mappings(model_cls, updates)
 
     def _serialize_row(self, row_data, time_key):
-        """Convert a row dict to API-serializable form: isoformat the time field, drop fetched_at."""
+        """Convert a row dict to API-serializable form: isoformat the time field, drop fetched_at"""
         d = {k: v for k, v in row_data.items() if k != "fetched_at"}
         d[time_key] = d[time_key].isoformat()
         return d

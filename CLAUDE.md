@@ -18,6 +18,7 @@ Flask REST API for fetching forecast data from a Redis cache, database, or API. 
 - pytest for testing (fixtures in `tests/conftest.py`)
 - pytest tests should be written with Arrange Act Assert comments with the name format function_input_expectedResult()
 - PEP 8 with 100 character lines
+- import statements should be at the top of the file, not in functions
 
 ## Common Commands
 ```bash
