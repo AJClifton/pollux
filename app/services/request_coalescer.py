@@ -1,11 +1,14 @@
 import threading
 
+from app.core.metrics import coalescer_in_flight, coalescer_waits_total
+
 
 class RequestCoalescer:
     """Deduplicates concurrent identical calls. If a call for a given key is already
     in-flight, subsequent callers wait for and share the same result."""
 
-    def __init__(self):
+    def __init__(self, name):
+        self._name = name
         self._lock = threading.Lock()
         self._in_flight = {}
 
@@ -18,18 +21,21 @@ class RequestCoalescer:
         with self._lock:
             if key in self._in_flight:
                 event, slot = self._in_flight[key]
+                is_leader = False
             else:
                 event = threading.Event()
                 slot = {"result": None, "error": None}
                 self._in_flight[key] = (event, slot)
-                event = None
+                is_leader = True
 
-        if event is not None:
+        if not is_leader:
+            coalescer_waits_total.labels(coalescer=self._name).inc()
             event.wait()
             if slot["error"] is not None:
                 raise slot["error"]
             return slot["result"]
 
+        coalescer_in_flight.labels(coalescer=self._name).inc()
         try:
             result = func(*args, **kwargs)
             with self._lock:
@@ -45,7 +51,8 @@ class RequestCoalescer:
             with self._lock:
                 event_to_set, _ = self._in_flight.pop(key)
             event_to_set.set()
+            coalescer_in_flight.labels(coalescer=self._name).dec()
 
 
-forecast_coalescer = RequestCoalescer()
-geocode_coalescer = RequestCoalescer()
+forecast_coalescer = RequestCoalescer("forecast")
+geocode_coalescer = RequestCoalescer("geocode")

@@ -4,6 +4,9 @@ import requests
 from flask import current_app
 
 from app.core.extensions import utcnow
+from app.core.metrics import time_external_api
+
+PROVIDER = "open_meteo"
 
 HOURLY_FIELD_MAP = {
     "temperature_2m": "temperature",
@@ -43,17 +46,19 @@ class OpenMeteoClient:
             "hourly": ",".join(HOURLY_FIELD_MAP.keys()),
             "daily": ",".join(DAILY_FIELD_MAP.keys()),
         }
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
+        with time_external_api(PROVIDER):
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+            return resp.json()
 
     def fetch_geocode(self, name):
         """Fetch geocoding results from Open-Meteo. Raises on HTTP errors."""
         url = current_app.config["OPEN_METEO_GEOCODING_URL"]
         params = {"name": name, "count": 5, "language": "en"}
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
+        with time_external_api(PROVIDER):
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+            return resp.json()
 
     def parse_forecast(self, lat, lon, api_data):
         """Parse Open-Meteo response into hourly and daily row dicts."""
