@@ -25,7 +25,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./pollux-data-service
           push: true
           tags: ghcr.io/ajclifton/pollux-data-service:latest
 
